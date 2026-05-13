@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BluWave — Service Provider Email Sequences</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #132543;
+    --navy-mid: #1e3560;
+    --cyan: #53BEE8;
+    --yellow: #EDAA42;
+    --white: #FFFFFF;
+    --ink: #31394C;
+    --muted: #A4B9CA;
+    --bg: #F4F7FA;
+    --border: #DDE5EE;
+    --font: 'Hanken Grotesk', system-ui, sans-serif;
+    --radius: 12px;
+    --email-width: 600px;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  /* ── SIDEBAR ── */
+  .layout { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: var(--navy);
+    padding: 28px 0;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .sidebar-logo {
+    padding: 0 24px 28px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 20px;
+  }
+
+  .sidebar-logo .wordmark {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--white);
+    letter-spacing: -0.3px;
+  }
+
+  .sidebar-logo .wordmark span { color: var(--cyan); }
+
+  .sidebar-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 24px;
+    margin-bottom: 8px;
+    margin-top: 16px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 24px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all 0.15s;
+    color: rgba(255,255,255,0.6);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--white); }
+
+  .nav-item.active {
+    border-left-color: var(--cyan);
+    background: rgba(83,190,232,0.1);
+    color: var(--white);
+  }
+
+  .nav-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot-threshold { background: var(--cyan); }
+  .dot-hr { background: var(--yellow); }
+  .dot-ai { background: #51b79b; }
+
+  /* ── MAIN ── */
+  .main {
+    flex: 1;
+    display: flex;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  /* ── EDITOR PANEL ── */
+  .editor-panel {
+    width: 420px;
+    min-width: 420px;
+    background: var(--white);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
+  }
+
+  .editor-header {
+    padding: 24px 24px 0;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+    position: sticky;
+    top: 0;
+    background: var(--white);
+    z-index: 10;
+  }
+
+  .editor-header h2 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 4px;
+  }
+
+  .editor-header p {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .editor-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 16px 24px 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--white);
+  }
+
+  .editor-tab {
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .editor-tab.active { color: var(--navy); border-bottom-color: var(--cyan); }
+  .editor-tab:hover:not(.active) { color: var(--ink); }
+
+  .editor-fields { padding: 20px 24px; }
+
+  .field-group { margin-bottom: 18px; }
+
+  .field-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .field-input {
+    width: 100%;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-family: var(--font);
+    font-size: 13px;
+    color: var(--ink);
+    transition: border-color 0.15s;
+    outline: none;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  .field-input:focus { border-color: var(--cyan); }
+
+  .save-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: #046040;
+    background: #e6f4ef;
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .save-badge.show { opacity: 1; }
+
+  /* ── PREVIEW PANEL ── */
+  .preview-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px;
+    background: #E8EDF4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .preview-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #8A9AB0;
+    margin-bottom: 16px;
+    align-self: flex-start;
+  }
+
+  /* ── EMAIL SHELL ── */
+  .email-shell {
+    width: var(--email-width);
+    max-width: 100%;
+    background: var(--white);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(19,37,67,0.12);
+    font-family: var(--font);
+    margin-bottom: 8px;
+  }
+
+  /* Email header bar (mimics email client) */
+  .email-chrome {
+    background: #F0F2F5;
+    border-bottom: 1px solid #DDE1E8;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .chrome-dots { display: flex; gap: 5px; }
+  .chrome-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .chrome-dot:nth-child(1) { background: #FF5F57; }
+  .chrome-dot:nth-child(2) { background: #FFBD2E; }
+  .chrome-dot:nth-child(3) { background: #28C840; }
+
+  .chrome-subject {
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+    flex: 1;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── BRANDED EMAIL HEADER ── */
+  .email-brand-header {
+    background: var(--navy);
+    padding: 20px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .email-logo {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--white);
+    letter-spacing: -0.3px;
+  }
+
+  .email-logo span { color: var(--cyan); }
+
+  .email-date-tag {
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 500;
+    text-align: right;
+    line-height: 1.5;
+  }
+
+  /* ── EMAIL BODY ── */
+  .email-body { padding: 36px 40px; }
+
+  .email-sender {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sender-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--cyan);
+  }
+
+  .sender-info { flex: 1; }
+
+  .sender-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--navy);
+  }
+
+  .sender-title {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .email-subject-line {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--navy);
+    line-height: 1.25;
+    margin-bottom: 20px;
+    letter-spacing: -0.3px;
+  }
+
+  .email-subject-line span { color: var(--cyan); }
+
+  .email-p {
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+
+  .email-stat-box {
+    background: var(--navy);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 24px 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .stat-number {
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--cyan);
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .stat-desc {
+    font-size: 13px;
+    color: rgba(255,255,255,0.75);
+    line-height: 1.5;
+  }
+
+  .email-checklist { margin: 20px 0; }
+
+  .checklist-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    font-size: 14px;
+    color: var(--ink);
+    line-height: 1.5;
+    border-bottom: 1px solid #f0f2f5;
+  }
+
+  .checklist-item:last-child { border-bottom: none; }
+
+  .check-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(83,190,232,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .check-icon svg { width: 10px; height: 10px; }
+
+  .email-quote-box {
+    border-left: 3px solid var(--cyan);
+    background: rgba(83,190,232,0.06);
+    padding: 14px 18px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 14px;
+    color: var(--ink);
+    line-height: 1.6;
+    font-style: italic;
+  }
+
+  .email-cta-block {
+    background: var(--navy);
+    border-radius: 10px;
+    padding: 24px 28px;
+    margin-top: 28px;
+    text-align: center;
+  }
+
+  .email-cta-block p {
+    font-size: 13px;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+
+  .cta-btn {
+    display: inline-block;
+    background: var(--cyan);
+    color: var(--navy);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 11px 28px;
+    border-radius: 60px;
+    text-decoration: none;
+    letter-spacing: 0.2px;
+  }
+
+  .email-sign {
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 14px;
+    color: var(--ink);
+    line-height: 1.7;
+  }
+
+  .email-footer {
+    background: #F4F7FA;
+    padding: 16px 40px;
+    text-align: center;
+    border-top: 1px solid var(--border);
+  }
+
+  .email-footer p {
+    font-size: 11px;
+    color: #8A9AB0;
+    line-height: 1.6;
+  }
+
+  .email-footer a { color: var(--cyan); text-decoration: none; }
+
+  /* Sequence badge chips */
+  .seq-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+
+  .seq-badge-threshold { background: rgba(83,190,232,0.12); color: var(--cyan); }
+  .seq-badge-hr { background: rgba(237,170,66,0.12); color: var(--yellow); }
+  .seq-badge-ai { background: rgba(81,183,155,0.12); color: #51b79b; }
+
+  [contenteditable] { cursor: text; }
+  [contenteditable]:hover { outline: 1.5px dashed var(--cyan); border-radius: 3px; }
+  [contenteditable]:focus { outline: 2px solid var(--cyan); border-radius: 3px; }
+
+  .hint-bar {
+    background: rgba(83,190,232,0.08);
+    border: 1px solid rgba(83,190,232,0.2);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #4A7A96;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .hint-bar svg { flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="wordmark">Blu<span>Wave</span></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px;font-weight:500;">SP Email Sequences</div>
+    </div>
+
+    <div class="sidebar-label">Sequence 1</div>
+    <div class="nav-item active" onclick="showEmail('t1')" id="nav-t1">
+      <span class="nav-dot dot-threshold"></span>Threshold — Email 1
+    </div>
+    <div class="nav-item" onclick="showEmail('t2')" id="nav-t2">
+      <span class="nav-dot dot-threshold"></span>Threshold — Email 2
+    </div>
+
+    <div class="sidebar-label">Sequence 2A</div>
+    <div class="nav-item" onclick="showEmail('hr1')" id="nav-hr1">
+      <span class="nav-dot dot-hr"></span>HR Providers — Email 1
+    </div>
+    <div class="nav-item" onclick="showEmail('hr2')" id="nav-hr2">
+      <span class="nav-dot dot-hr"></span>HR Providers — Email 2
+    </div>
+
+    <div class="sidebar-label">Sequence 2B</div>
+    <div class="nav-item" onclick="showEmail('ai1')" id="nav-ai1">
+      <span class="nav-dot dot-ai"></span>AI Providers — Email 1
+    </div>
+    <div class="nav-item" onclick="showEmail('ai2')" id="nav-ai2">
+      <span class="nav-dot dot-ai"></span>AI Providers — Email 2
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- EDITOR -->
+    <div class="editor-panel">
+      <div class="editor-header">
+        <h2 id="editor-title">Threshold Nudge — Email 1</h2>
+        <p id="editor-meta">Triggered at 1 engagement &nbsp;|&nbsp; Sent from Taylor (alias)</p>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
+          <span class="save-badge" id="save-badge">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 5.5L4 8L8.5 2" stroke="#046040" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Saved
+          </span>
+        </div>
+      </div>
+
+      <div class="editor-tabs">
+        <div class="editor-tab active" id="tab-content" onclick="switchTab('content')">Content</div>
+        <div class="editor-tab" id="tab-meta" onclick="switchTab('meta')">Details</div>
+      </div>
+
+      <div class="editor-fields" id="fields-content">
+        <div class="hint-bar">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="#53BEE8" stroke-width="1.2"/><path d="M7 6v4M7 4.5v.5" stroke="#53BEE8" stroke-width="1.2" stroke-linecap="round"/></svg>
+          Edit any field below. Changes save automatically to Supabase.
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Subject Line</label>
+          <input class="field-input" id="field-subject" oninput="syncField('subject')" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Opening paragraph</label>
+          <textarea class="field-input" id="field-p1" rows="4" oninput="syncField('p1')"></textarea>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Main message</label>
+          <textarea class="field-input" id="field-p2" rows="5" oninput="syncField('p2')"></textarea>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Closing paragraph</label>
+          <textarea class="field-input" id="field-p3" rows="3" oninput="syncField('p3')"></textarea>
+        </div>
+        <div class="field-group" id="group-statNum">
+          <label class="field-label">Stat box — number</label>
+          <input class="field-input" id="field-statNum" oninput="syncField('statNum')" />
+        </div>
+        <div class="field-group" id="group-statDesc">
+          <label class="field-label">Stat box — description</label>
+          <textarea class="field-input" id="field-statDesc" rows="2" oninput="syncField('statDesc')"></textarea>
+        </div>
+        <div class="field-group">
+          <label class="field-label">CTA block — supporting text</label>
+          <textarea class="field-input" id="field-ctaBody" rows="2" oninput="syncField('ctaBody')"></textarea>
+        </div>
+        <div class="field-group">
+          <label class="field-label">CTA button label</label>
+          <input class="field-input" id="field-cta" oninput="syncField('cta')" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Sign-off</label>
+          <textarea class="field-input" id="field-sign" rows="3" oninput="syncField('sign')"></textarea>
+        </div>
+      </div>
+
+      <div class="editor-fields" id="fields-meta" style="display:none;">
+        <div class="field-group">
+          <label class="field-label">Sequence</label>
+          <input class="field-input" id="field-seq" readonly style="background:#f8f9fb;cursor:default;" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Audience</label>
+          <input class="field-input" id="field-audience" readonly style="background:#f8f9fb;cursor:default;" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Send trigger</label>
+          <input class="field-input" id="field-trigger" readonly style="background:#f8f9fb;cursor:default;" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Cadence</label>
+          <input class="field-input" id="field-cadence" readonly style="background:#f8f9fb;cursor:default;" />
+        </div>
+      </div>
+    </div>
+
+    <!-- PREVIEW -->
+    <div class="preview-panel">
+      <div class="preview-label">Email Preview</div>
+
+      <div class="email-shell" id="email-preview">
+        <!-- injected by JS -->
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── SUPABASE CONFIG ──
+const SUPABASE_URL = 'https://dzorpzxoyrthujerczwi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6b3JwenhveXJ0aHVqZXJjendpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2ODg3NTgsImV4cCI6MjA5NDI2NDc1OH0.jXyzKbXwePDPIOhIA6WCPx-hV6LJ1rSnqoj-HlD_7L0';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+async function saveField(emailId, field, value) {
+  const { error } = await db
+    .from('email_edits')
+    .upsert({ email_id: emailId, field: field, value: value }, { onConflict: 'email_id,field' });
+  if (error) console.error('Save error:', error);
+}
+
+async function loadAllSavedEdits() {
+  const { data, error } = await db.from('email_edits').select('*');
+  if (error || !data) return;
+  data.forEach(row => {
+    if (emails[row.email_id] && row.field in emails[row.email_id]) {
+      emails[row.email_id][row.field] = row.value;
+    }
+  });
+}
+
+const TAYLOR_PHOTO = 'data:image/jpeg;base64,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';
+
+const emails = {
+  t1: {
+    navId: 'nav-t1',
+    title: 'Threshold Nudge — Email 1',
+    meta: 'Triggered at 1 engagement  |  Sent from Taylor (alias)',
+    badge: 'seq-badge-threshold',
+    badgeText: 'Sequence 1 — Threshold Nudge',
+    seq: 'Sequence 1: Threshold Nudge',
+    audience: 'Service providers at 1 engagement',
+    trigger: 'Triggered at 1 engagement milestone',
+    cadence: 'One touch per threshold',
+    subject: 'You just had your first engagement through BluWave',
+    p1: 'Hey [First Name],\n\nWanted to reach out personally and say congratulations on completing your first project through BluWave. That is a big deal, and we are glad it happened.',
+    p2: 'I also wanted to share something we have seen play out with providers who go on to win a lot of work through us. It almost always comes back to one thing: a complete, up to date profile.\n\nOur matching is powered by DORE-E, our system built to identify the best fit for every project. The providers DORE-E surfaces most consistently are the ones with complete, detailed profiles, because that is the data it uses to make the match. The more specific your qualifications (the specific use cases and project types listed on your profile), the better your chances of showing up for the right opportunity.',
+    p3: 'If you have a few minutes this week, log in and take a look at your profile. Add any new use cases or qualifications from your recent work. The more specific, the better.',
+    statNum: null,
+    statDesc: null,
+    hasList: false,
+    listItems: [],
+    ctaBody: 'Log in to your BluWave profile to update your qualifications and stay visible to our concierge team.',
+    cta: 'Log in and review your profile',
+    sign: 'Really glad to have you in the network. Let us help you get the next one.\n\nTaylor',
+  },
+  t2: {
+    navId: 'nav-t2',
+    title: 'Threshold Nudge — Email 2',
+    meta: 'Triggered at 2 engagements  |  Sent from Taylor (alias)',
+    badge: 'seq-badge-threshold',
+    badgeText: 'Sequence 1 — Threshold Nudge',
+    seq: 'Sequence 1: Threshold Nudge',
+    audience: 'Service providers at 2 engagements',
+    trigger: 'Triggered at 2 engagement milestone',
+    cadence: 'One touch per threshold',
+    subject: 'Two down. Here is how to keep the momentum going.',
+    p1: 'Hey [First Name],\n\nTwo engagements in. You are building something real here, and I want to make sure you have every advantage as you keep going.',
+    p2: 'Our matching is powered by DORE-E, our system built to identify the best fit for every project. The providers DORE-E surfaces most consistently are the ones with detailed, current profiles because that is the data it uses to make the match. It is not about favorites, it is about fit, and your profile is how you demonstrate that fit every time a new project comes in.',
+    p3: 'Log in here and take five minutes to review: [link]',
+    statNum: null,
+    statDesc: null,
+    hasList: true,
+    listItems: [
+      'Have you added your two most recent projects as qualifications on your profile?',
+      'Does your profile reflect the specific type of work you do best?',
+      'Is your contact information and availability up to date?',
+    ],
+    ctaBody: 'Log in to your BluWave profile to update your qualifications and stay visible to our concierge team.',
+    cta: 'Log in and update your profile',
+    sign: 'We are rooting for you. Let us know if there is anything we can do to support you.\n\nTaylor',
+  },
+  hr1: {
+    navId: 'nav-hr1',
+    title: 'HR Providers — Email 1',
+    meta: 'Quarterly send  |  Audience: HR and human capital service providers',
+    badge: 'seq-badge-hr',
+    badgeText: 'Sequence 2A — HR Providers',
+    seq: 'Sequence 2A: HR Providers',
+    audience: 'HR and human capital service providers',
+    trigger: 'Quarterly cadence',
+    cadence: '2-email sequence, quarterly',
+    subject: 'HR demand in PE is up. Here is what that means for you.',
+    p1: 'Hey [First Name],\n\nI wanted to reach out because we are seeing something worth paying attention to right now: demand for HR and human capital resources from PE firms and their portfolio companies is up, and our concierge team is actively fielding these requests.',
+    p2: 'Here is what we have seen separate the firms that win that work from the ones that do not. One HR provider in our network went from a handful of projects to 8 engagements in a single year. They did not change their service offering. They kept over 100 specific qualifications on file and stayed active in the platform. Our team knew exactly who they were when the right project came in.\n\nThat comes down to specificity. When our matching system is searching for an HR resource, it is not looking for "HR consulting." It is looking for things like post-acquisition org design, compensation benchmarking, HRIS implementation, or interim CHRO support. The providers who have those specific use cases on file are the ones getting introduced first.',
+    p3: 'If your profile is broad right now, it might be costing you introductions you would otherwise win. It only takes a few minutes to add a use case or update your qualifications: [link]',
+    statNum: '8x',
+    statDesc: 'Engagements in a single year — one HR provider in our network, by keeping 100+ specific qualifications on file.',
+    hasList: false,
+    listItems: [],
+    ctaBody: 'Log in to your BluWave profile to update your qualifications and stay visible to our concierge team.',
+    cta: 'Update your qualifications',
+    sign: 'Happy to answer any questions about how the matching process works if that would be helpful. Just reply here.\n\nTaylor',
+  },
+  hr2: {
+    navId: 'nav-hr2',
+    title: 'HR Providers — Email 2',
+    meta: 'Quarterly send  |  Audience: HR and human capital service providers',
+    badge: 'seq-badge-hr',
+    badgeText: 'Sequence 2A — HR Providers',
+    seq: 'Sequence 2A: HR Providers',
+    audience: 'HR and human capital service providers',
+    trigger: 'Quarterly cadence (follow email 1)',
+    cadence: '2-email sequence, quarterly',
+    subject: 'Your niche is your biggest advantage right now.',
+    p1: 'Hey [First Name],\n\nFollowing up on my last note because I think this is worth saying plainly.',
+    p2: 'The PE firms coming to us right now have very specific needs. The more clearly your profile communicates what you actually do and who you have done it for, the more likely your name is the one that comes up when the right project lands.\n\nEven if you think your profile is already detailed, the providers winning the most work are constantly adding to it as they complete new projects. It is less about a one-time setup and more about keeping it current so our system always has your best, most recent work to pull from.',
+    p3: 'If you have added new work recently, this week is a good time to update your profile: [link]',
+    statNum: null,
+    statDesc: null,
+    hasList: false,
+    listItems: [],
+    ctaBody: 'Log in to your BluWave profile to update your qualifications and stay visible to our concierge team.',
+    cta: 'Add your most recent work',
+    sign: 'We want to see you win more work. This is one of the most direct ways we can help make that happen.\n\nTaylor',
+  },
+  ai1: {
+    navId: 'nav-ai1',
+    title: 'AI Providers — Email 1',
+    meta: 'Quarterly or market-signal triggered  |  Audience: AI and ML service providers',
+    badge: 'seq-badge-ai',
+    badgeText: 'Sequence 2B — AI Providers',
+    seq: 'Sequence 2B: AI Providers',
+    audience: 'AI and ML service providers',
+    trigger: 'Quarterly or tied to market signals',
+    cadence: '2-email sequence',
+    subject: 'Follow-on work does not happen by accident.',
+    p1: 'Hey [First Name],\n\nOne thing we have noticed with the providers earning repeat business through BluWave: they treat their profile like it is working for them even when they are not actively looking.',
+    p2: 'Here is what that looks like in practice. We have seen AI and ML providers in our network grow from a couple of engagements to 5 or more in a single year, including follow-on work from the same clients. That kind of repeat engagement happens when our matching system can confidently reintroduce you because your profile reflects your most current work.\n\nOur matching is powered by DORE-E, our system built to identify the best fit for every project. When a PE firm comes back with a need adjacent to work we already placed, DORE-E goes to work immediately. The providers who show up are the ones with specific, up to date qualifications on file.',
+    p3: 'If your most recent AI or ML work is not reflected in your profile yet, that is worth fixing today: [link]',
+    statNum: '5+',
+    statDesc: 'Engagements in a single year for AI and ML providers who keep their qualifications current and stay active on the platform.',
+    hasList: false,
+    listItems: [],
+    ctaBody: 'Log in to your BluWave profile to update your qualifications and stay visible to our concierge team.',
+    cta: 'Update your profile today',
+    sign: 'We are seeing real momentum in this space and we want you in the middle of it.\n\nTaylor',
+  },
+  ai2: {
+    navId: 'nav-ai2',
+    title: 'AI Providers — Email 2',
+    meta: 'Quarterly or market-signal triggered  |  Audience: AI and ML service providers',
+    badge: 'seq-badge-ai',
+    badgeText: 'Sequence 2B — AI Providers',
+    seq: 'Sequence 2B: AI Providers',
+    audience: 'AI and ML service providers',
+    trigger: 'Quarterly or tied to market signals (follow email 1)',
+    cadence: '2-email sequence',
+    subject: 'AI demand in PE is accelerating. Your pipeline can reflect that.',
+    p1: 'Hey [First Name],\n\nThe volume of AI and technology related requests coming through BluWave right now is significant, and I want to make sure you are positioned to benefit from it.',
+    p2: 'PE firms are actively seeking AI and ML resources for both diligence and value creation work inside their portfolio companies. The providers winning that work are not necessarily the biggest or most well known. They are the ones our system can match with confidence because their profiles clearly reflect what they do and who they have done it for.',
+    p3: 'The best thing you can do right now is make sure your profile reflects your most current work: [link]\n\nIf you have taken on any new AI or ML projects recently, add them. The more specific your use cases, the better your chances of showing up when the next project comes in.',
+    statNum: null,
+    statDesc: null,
+    hasList: false,
+    listItems: [],
+    ctaBody: 'Log in to your BluWave profile to update your qualifications and stay visible to our concierge team.',
+    cta: 'Add your most recent AI work',
+    sign: 'Taylor',
+  },
+};
+
+let current = 't1';
+let currentTab = 'content';
+
+function nl2p(text, className) {
+  return text.split('\n\n').map(p =>
+    `<p class="${className}" contenteditable="true">${p.replace(/\n/g,'<br>')}</p>`
+  ).join('');
+}
+
+function renderEmail(id) {
+  const d = emails[id];
+  const preview = document.getElementById('email-preview');
+
+  const listHTML = d.hasList ? `
+    <div class="email-checklist">
+      ${d.listItems.map(item => `
+        <div class="checklist-item">
+          <div class="check-icon">
+            <svg viewBox="0 0 10 10" fill="none"><path d="M1.5 5.5L4 8L8.5 2" stroke="#53BEE8" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <span contenteditable="true">${item}</span>
+        </div>
+      `).join('')}
+    </div>` : '';
+
+  const statHTML = d.statNum ? `
+    <div class="email-stat-box">
+      <div class="stat-number" contenteditable="true">${d.statNum}</div>
+      <div class="stat-desc" contenteditable="true">${d.statDesc}</div>
+    </div>` : '';
+
+  preview.innerHTML = `
+    <div class="email-chrome">
+      <div class="chrome-dots">
+        <div class="chrome-dot"></div><div class="chrome-dot"></div><div class="chrome-dot"></div>
+      </div>
+      <div class="chrome-subject">${d.subject}</div>
+    </div>
+
+    <div class="email-brand-header">
+      <div class="email-logo">Blu<span>Wave</span></div>
+      <div class="email-date-tag">SERVICE PROVIDER<br>BEST PRACTICES</div>
+    </div>
+
+    <div class="email-body">
+      <div class="email-sender">
+        <img class="sender-avatar" src="${TAYLOR_PHOTO}" alt="Taylor">
+        <div class="sender-info">
+          <div class="sender-name">Taylor</div>
+          <div class="sender-title">BluWave Network Team</div>
+        </div>
+      </div>
+
+      <div class="seq-badge ${d.badge}">${d.badgeText}</div>
+
+      <div class="email-subject-line" id="prev-subject" contenteditable="true">${d.subject}</div>
+
+      ${nl2p(d.p1, 'email-p')}
+      ${statHTML}
+      ${nl2p(d.p2, 'email-p')}
+      ${listHTML}
+      ${nl2p(d.p3, 'email-p')}
+
+      <div class="email-cta-block">
+        <p id="prev-ctaBody">${d.ctaBody}</p>
+        <a class="cta-btn" href="#" id="prev-cta">${d.cta} →</a>
+      </div>
+
+      <div class="email-sign" id="prev-sign">${d.sign.replace(/\n/g,'<br>')}</div>
+    </div>
+
+    <div class="email-footer">
+      <p>BluWave &nbsp;|&nbsp; <a href="#">bluwave.net</a> &nbsp;|&nbsp; Nashville, TN &nbsp;|&nbsp; <a href="#">Unsubscribe</a></p>
+    </div>
+  `;
+
+  // Subject line inline sync
+  const prevSubj = document.getElementById('prev-subject');
+  if (prevSubj) {
+    prevSubj.addEventListener('input', () => {
+      const val = prevSubj.innerText;
+      emails[current].subject = val;
+      document.getElementById('field-subject').value = val;
+      const chrome = document.querySelector('.chrome-subject');
+      if (chrome) chrome.textContent = val;
+      saveField(current, 'subject', val);
+      flashSave();
+    });
+  }
+}
+
+function updateFields(id) {
+  const d = emails[id];
+  document.getElementById('field-subject').value = d.subject;
+  document.getElementById('field-p1').value = d.p1;
+  document.getElementById('field-p2').value = d.p2;
+  document.getElementById('field-p3').value = d.p3;
+  document.getElementById('field-statNum').value = d.statNum || '';
+  document.getElementById('field-statDesc').value = d.statDesc || '';
+  document.getElementById('field-ctaBody').value = d.ctaBody;
+  document.getElementById('field-cta').value = d.cta;
+  document.getElementById('field-sign').value = d.sign;
+  document.getElementById('field-seq').value = d.seq;
+  document.getElementById('field-audience').value = d.audience;
+  document.getElementById('field-trigger').value = d.trigger;
+  document.getElementById('field-cadence').value = d.cadence;
+  document.getElementById('editor-title').textContent = d.title;
+  document.getElementById('editor-meta').textContent = d.meta;
+  // Show/hide stat fields based on whether this email has a stat box
+  const showStat = d.statNum !== null;
+  document.getElementById('group-statNum').style.display = showStat ? 'block' : 'none';
+  document.getElementById('group-statDesc').style.display = showStat ? 'block' : 'none';
+}
+
+function showEmail(id) {
+  // Update nav
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('nav-' + id).classList.add('active');
+  current = id;
+  renderEmail(id);
+  updateFields(id);
+}
+
+function syncField(field) {
+  const val = document.getElementById('field-' + field).value;
+  emails[current][field] = val;
+  // Update preview in place without full re-render where possible
+  if (field === 'subject') {
+    const el = document.getElementById('prev-subject');
+    if (el) el.innerText = val;
+    const chrome = document.querySelector('.chrome-subject');
+    if (chrome) chrome.textContent = val;
+  } else if (field === 'ctaBody') {
+    const el = document.getElementById('prev-ctaBody');
+    if (el) el.innerText = val;
+  } else if (field === 'cta') {
+    const el = document.getElementById('prev-cta');
+    if (el) el.innerText = val + ' →';
+  } else if (field === 'sign') {
+    const el = document.getElementById('prev-sign');
+    if (el) el.innerHTML = val.replace(/\n/g,'<br>');
+  } else if (field === 'statNum' || field === 'statDesc') {
+    // Re-render for stat changes since box may need to appear/disappear
+    renderEmail(current);
+    updateFields(current);
+  } else {
+    renderEmail(current);
+    updateFields(current);
+  }
+  saveField(current, field, val);
+  flashSave();
+}
+
+function flashSave() {
+  const badge = document.getElementById('save-badge');
+  badge.classList.add('show');
+  clearTimeout(window._saveTimer);
+  window._saveTimer = setTimeout(() => badge.classList.remove('show'), 1800);
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.editor-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('fields-content').style.display = tab === 'content' ? 'block' : 'none';
+  document.getElementById('fields-meta').style.display = tab === 'meta' ? 'block' : 'none';
+}
+
+// Init — load any saved edits from Supabase first, then render
+loadAllSavedEdits().then(() => showEmail('t1'));
+</script>
+</body>
+</html>
